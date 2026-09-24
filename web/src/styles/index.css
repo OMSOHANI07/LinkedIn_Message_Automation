@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-serif: "Lora", "Iowan Old Style", ui-serif, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-paper: #f6f2ea;
+  --color-paper-raised: #fbf8f2;
+  --color-paper-sunken: #efe9dd;
+  --color-ink: #211d16;
+  --color-ink-soft: #5b5548;
+  --color-ink-faint: #948d7c;
+  --color-hairline: #ddd4c1;
+
+  --color-sage: #5f7259;
+  --color-sage-soft: #e3e8dd;
+  --color-sage-strong: #445341;
+
+  --color-clay: #a5602f;
+  --color-clay-soft: #f3e2cf;
+  --color-clay-strong: #7c4720;
+
+  --color-rose: #a3453f;
+  --color-rose-soft: #f2ded9;
+}
+
+:root[data-theme="dark"] {
+  --color-paper: #17150f;
+  --color-paper-raised: #1e1b14;
+  --color-paper-sunken: #100f0a;
+  --color-ink: #efe9dc;
+  --color-ink-soft: #b9b1a0;
+  --color-ink-faint: #7d7666;
+  --color-hairline: #37321f;
+
+  --color-sage: #93a98b;
+  --color-sage-soft: #232c20;
+  --color-sage-strong: #c3d4bc;
+
+  --color-clay: #d19662;
+  --color-clay-soft: #2c2116;
+  --color-clay-strong: #eab883;
+
+  --color-rose: #d4837c;
+  --color-rose-soft: #2b1a18;
+}
+
+html {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle paper grain - a faint noise texture, not a gradient */
+.paper-grain {
+  position: relative;
+  isolation: isolate;
+}
+.paper-grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--color-sage-soft);
+  color: var(--color-ink);
+}
+
+* {
+  scrollbar-color: var(--color-hairline) transparent;
+}
