@@ -1,0 +1,14 @@
+.venv
+venv
+__pycache__
+*.pyc
+.env
+.env.local
+*.db
+*.db-journal
+tests
+notes
+node_modules
+web/dist
+.git
+.DS_Store

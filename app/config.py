@@ -79,7 +79,10 @@ class Settings:
 
     @property
     def database_path(self) -> Path:
-        return BASE_DIR / "skinstinct.db"
+        """Overridable so a deployment can point this at a mounted persistent
+        volume (e.g. Railway) instead of the container's ephemeral disk."""
+        raw = os.getenv("DATABASE_PATH")
+        return Path(raw) if raw else BASE_DIR / "skinstinct.db"
 
     @property
     def notes_import_dir(self) -> Path:
@@ -88,6 +91,14 @@ class Settings:
     @property
     def web_dist_dir(self) -> Path:
         return BASE_DIR / "web" / "dist"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Comma-separated extra origins (e.g. a Vercel deployment URL) allowed
+        to call the API, in addition to the local Vite dev server."""
+        raw = os.getenv("CORS_ORIGINS", "").strip()
+        extra = [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return ["http://localhost:5173", "http://127.0.0.1:5173", *extra]
 
 
 settings = Settings()

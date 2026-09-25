@@ -235,6 +235,50 @@ dashboard. Imported notes sit in the backlog until triaged via `/backlog`,
 `/draft`, or the weekly job - only messages posted live into the channel
 trigger instant evaluation.
 
+## Cloud deployment (Railway + Vercel)
+
+Running everything locally (above) is the simplest setup and needs no
+hosting account. If you want the dashboard reachable without your machine
+being on, deploy the backend + bot to Railway and the dashboard to Vercel.
+
+**Why two hosts, and why the bot has to move too:** the dashboard reads the
+same SQLite file the Telegram bot writes to. If only the API were deployed
+somewhere while the bot kept running on your laptop, the hosted dashboard
+would be stuck looking at an empty, disconnected database. So the bot and
+the API run together, in one container, sharing one disk - Vercel then only
+hosts the static frontend, pointed at that backend's URL.
+
+### 1. Backend + bot -> Railway
+
+1. On [railway.app](https://railway.app), **New Project -> Deploy from GitHub
+   repo**, pick this repo. Railway detects the `Dockerfile` at the repo root
+   and builds it - no extra config needed for the build itself.
+2. **Add a volume**: service Settings -> Volumes -> New Volume, mount path
+   `/data`. This is the persistent disk the SQLite file lives on so it
+   survives redeploys.
+3. **Environment variables** (service Settings -> Variables): set everything
+   from `.env.example` (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
+   `GEMINI_API_KEY`, etc.), plus:
+   - `DATABASE_PATH=/data/skinstinct.db`
+   - `CORS_ORIGINS=https://your-app.vercel.app` (set this after step 2 below,
+     once you know the Vercel URL - redeploy to pick it up)
+4. Deploy. Railway assigns a public URL (Settings -> Networking -> Generate
+   Domain) - that's your backend URL for the next step. Check
+   `https://<that-url>/api/health` returns `{"status":"ok"}`.
+
+### 2. Dashboard -> Vercel
+
+1. On [vercel.com](https://vercel.com), **New Project**, import this repo,
+   set **Root Directory** to `web`. Framework preset: Vite (build command
+   `npm run build`, output directory `dist` - Vercel usually detects these).
+2. **Environment variable**: `VITE_API_BASE_URL=https://<your-railway-url>`
+   (the URL from step 1.4, no trailing slash).
+3. Deploy. Once you have the Vercel URL, go back to Railway and set
+   `CORS_ORIGINS` to it, then redeploy the Railway service.
+
+`web/vercel.json` already handles client-side routing (React Router) so
+refreshing a dashboard page doesn't 404.
+
 ## Bot commands
 
 - `/start` - what the bot does, and the "drafts only" principle

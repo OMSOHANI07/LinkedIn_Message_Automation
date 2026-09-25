@@ -7,8 +7,13 @@ import type {
   WeekStats,
 } from './types'
 
+// In local dev this is empty and Vite's proxy forwards /api to the backend
+// (see vite.config.ts). In production (e.g. a Vercel-hosted frontend calling
+// a separately-hosted backend) set VITE_API_BASE_URL to that backend's origin.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE_URL}/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...init,
   })
