@@ -21,6 +21,7 @@ import logging
 from sqlmodel import select
 from telegram import LinkPreviewOptions, Update
 from telegram.constants import ChatAction
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from app.bot import queue_worker
@@ -63,6 +64,20 @@ def _is_authorized_chat(chat_id: int) -> bool:
     return str(chat_id) == settings.telegram_chat_id
 
 
+async def _safe_edit_message_text(bot, **kwargs) -> None:
+    """edit_message_text, but treats Telegram's "message is not modified"
+    error as a no-op instead of a failure - this happens harmlessly when a
+    retry (e.g. a repeated Gemini outage) produces identical content to
+    what's already shown. Any other error still propagates normally."""
+    try:
+        await bot.edit_message_text(**kwargs)
+    except BadRequest as exc:
+        if "message is not modified" in str(exc).lower():
+            logger.debug("Skipped no-op edit for message %s", kwargs.get("message_id"))
+            return
+        raise
+
+
 def _is_authorized_user(user_id: int | None) -> bool:
     """Empty ADMIN_USER_IDS means anyone in the authorized chat is trusted -
     same behaviour as before this allow-list existed."""
@@ -95,7 +110,7 @@ async def _run_pipeline(
         with session_scope() as session:
             note = session.get(Note, note_id)
             if note is None:
-                await bot.edit_message_text(
+                await _safe_edit_message_text(bot,
                     chat_id=chat_id, message_id=initial_message_id, text="Couldn't find that note anymore."
                 )
                 return None
@@ -108,7 +123,7 @@ async def _run_pipeline(
             session.add(draft)
             session.commit()
 
-            await bot.edit_message_text(
+            await _safe_edit_message_text(bot,
                 chat_id=chat_id, message_id=initial_message_id, text=build_draft_message(draft), parse_mode="HTML"
             )
 
@@ -127,7 +142,7 @@ async def _run_pipeline(
             session.refresh(note)
             app_settings = get_settings(session)
 
-            await bot.edit_message_text(
+            await _safe_edit_message_text(bot,
                 chat_id=chat_id,
                 message_id=eval_message.message_id,
                 text=build_decision_message(draft, note, app_settings),
@@ -143,7 +158,7 @@ async def _run_pipeline(
     except Exception:
         logger.exception("Pipeline failed for note %s", note_id)
         try:
-            await bot.edit_message_text(
+            await _safe_edit_message_text(bot,
                 chat_id=chat_id,
                 message_id=initial_message_id,
                 text="⚠️ Couldn't evaluate this note. Tap Retry.",
@@ -176,7 +191,7 @@ async def _run_news_stage(bot, chat_id: int, draft_id: int, other_news: bool = F
         preview = LinkPreviewOptions(url=news_rows[0].url) if news_rows else LinkPreviewOptions(is_disabled=True)
 
         try:
-            await bot.edit_message_text(
+            await _safe_edit_message_text(bot,
                 chat_id=chat_id,
                 message_id=message_id,
                 text=text,
@@ -236,7 +251,7 @@ async def handle_incoming_note(update: Update, context: ContextTypes.DEFAULT_TYP
     async def job() -> None:
         if position > 1:
             try:
-                await context.bot.edit_message_text(
+                await _safe_edit_message_text(context.bot,
                     chat_id=chat.id, message_id=status.message_id, text=queued_text(1)
                 )
             except Exception:
@@ -282,7 +297,7 @@ async def _run_redraft(
 
     if new_draft is not None and old_chat_id and old_decision_message_id:
         try:
-            await context.bot.edit_message_text(
+            await _safe_edit_message_text(context.bot,
                 chat_id=old_chat_id,
                 message_id=old_decision_message_id,
                 text=f"↪️ Redrafted → see Draft #{new_draft.id}",
@@ -355,7 +370,7 @@ async def _refresh_decision_message(context, draft: Draft, note: Note) -> None:
         keyboard = decision_keyboard(draft, note, app_settings)
 
     try:
-        await context.bot.edit_message_text(
+        await _safe_edit_message_text(context.bot,
             chat_id=draft.telegram_chat_id,
             message_id=draft.decision_message_id,
             text=text,
@@ -410,7 +425,7 @@ async def _handle_discard(query, context, draft_id: int) -> None:
     await query.answer("Discarded.")
     if draft.telegram_chat_id and draft.decision_message_id:
         try:
-            await context.bot.edit_message_text(
+            await _safe_edit_message_text(context.bot,
                 chat_id=draft.telegram_chat_id, message_id=draft.decision_message_id, text="🗑 Discarded"
             )
         except Exception:
