@@ -241,7 +241,16 @@ async def handle_incoming_note(update: Update, context: ContextTypes.DEFAULT_TYP
             session, text, source=NoteSource.TELEGRAM, telegram_message_id=message.message_id
         )
     if note is None:
-        return  # duplicate note, silently skip
+        # Exact same text was already sent before - import_note_text dedupes
+        # silently, so without this the sender sees no reply at all and no
+        # sign of why (it won't show up in backlog either, since it was
+        # never a new note).
+        await context.bot.send_message(
+            chat_id=chat.id,
+            text="Already have this exact note - see its earlier draft/decision above, or edit the text and resend.",
+            reply_to_message_id=message.message_id,
+        )
+        return
 
     position = queue_worker.queue_position()
     status = await context.bot.send_message(

@@ -105,6 +105,8 @@ async def test_valid_note_is_queued_for_evaluation(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_duplicate_note_is_not_queued(monkeypatch):
+    """Not queued for evaluation, but the sender still gets told why -
+    silently doing nothing looks identical to a broken bot."""
     monkeypatch.setenv("MIN_NOTE_CHARS", "10")
     enqueue_mock = AsyncMock()
     monkeypatch.setattr(queue_worker, "enqueue", enqueue_mock)
@@ -118,7 +120,9 @@ async def test_duplicate_note_is_not_queued(monkeypatch):
     await handlers.handle_incoming_note(update, context)
 
     enqueue_mock.assert_not_called()
-    context.bot.send_message.assert_not_awaited()
+    context.bot.send_message.assert_awaited_once()
+    _, kwargs = context.bot.send_message.call_args
+    assert "already have this" in kwargs["text"].lower()
 
 
 # ---------------------------------------------------------------------------
